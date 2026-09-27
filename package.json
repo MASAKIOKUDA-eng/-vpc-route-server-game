@@ -1,0 +1,11 @@
+{
+  "name": "vpc-route-server-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS VPC Route Server を体験して学べるブラウザ用シミュレーションゲーム",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "Apache-2.0"
+}
