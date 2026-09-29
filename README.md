@@ -44,7 +44,8 @@ GitHub Pages などの静的ホスティングにそのまま置いても動き�
 
 ```
 index.html        画面
-css/style.css     スタイル (ライト/ダークモード対応)
+css/style.css     スタイル (白基調)
+assets/aws/       構成図用の AWS Architecture Icons
 js/sim.js         シミュレーションエンジン (DOM 非依存、Node.js でもテスト可能)
 js/app.js         UI・ミッション・クイズ
 test/sim.test.js  エンジンのテスト
@@ -53,6 +54,13 @@ test/sim.test.js  エンジンのテスト
 ```bash
 npm test
 ```
+
+## 構成図について
+
+構成図は AWS Architecture Icons (Light BG 版) の作図ルールに沿って、
+AWS Cloud → Region → VPC → Availability Zone → Private subnet のグループを入れ子にして描いています。
+VPC Route Server には専用アイコンがないため、Amazon VPC の Router アイコンで表しています。
+Route Server エンドポイントはサブネット内の ENI として作られるため、Elastic network interface アイコンを使っています。
 
 ## 注意
 

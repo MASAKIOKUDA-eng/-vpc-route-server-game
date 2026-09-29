@@ -329,23 +329,37 @@
   }
 
   // ================= 構成図 (SVG) =================
+  // AWS アーキテクチャアイコン (AWS Architecture Icons, Light BG) の作図ルールに合わせた配置
+  const ICON = (name) => `assets/aws/${name}.svg`;
   const POS = {
-    rs: { x: 480, y: 68 },
-    ep: { a: { x: 360, y: 205 }, c: { x: 600, y: 205 } },
-    appl: { 'appl-a': { x: 130, y: 268 }, 'appl-b': { x: 830, y: 268 } },
-    client: { 'client-a': { x: 110, y: 470 }, 'client-c': { x: 850, y: 470 } },
-    rtb: { 'rtb-work-a': { x: 320, y: 470 }, 'rtb-work-c': { x: 640, y: 470 } },
+    rs: { x: 480, y: 136 },
+    ep: { a: { x: 380, y: 290 }, c: { x: 580, y: 290 } },
+    appl: { 'appl-a': { x: 150, y: 306 }, 'appl-b': { x: 810, y: 306 } },
+    client: { 'client-a': { x: 124, y: 512 }, 'client-c': { x: 836, y: 512 } },
+    rtb: { 'rtb-work-a': { x: 323, y: 456 }, 'rtb-work-c': { x: 637, y: 456 } },
   };
+  const AZ_NAME = { a: 'ap-northeast-1a', c: 'ap-northeast-1c' };
+
+  function img(name, cx, cy, size, extra = '') {
+    return `<image href="${ICON(name)}" x="${cx - size / 2}" y="${cy - size / 2}" width="${size}" height="${size}" ${extra}/>`;
+  }
+
+  // AWS のグループ: 枠線 + 左上のグループアイコン + ラベル
+  function group(cls, x, y, w, h, icon, label, sub) {
+    let g = `<rect class="grp ${cls}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+    const tx = icon ? x + 32 : x + 10;
+    if (icon) g += `<image href="${ICON(icon)}" x="${x}" y="${y}" width="24" height="24"/>`;
+    g += `<text class="grp-label" x="${tx}" y="${y + 17}">${label}${sub ? ` <tspan class="grp-sub">${sub}</tspan>` : ''}</text>`;
+    return g;
+  }
 
   function bgpPath(appl, az) {
     const a = POS.appl[appl.id];
     const e = POS.ep[az];
-    if (appl.az === az) {
-      const sx = a.x + (appl.az === 'a' ? 70 : -70);
-      return `M${sx},${a.y - 10} L${e.x},${e.y}`;
-    }
-    const cx = appl.az === 'a' ? 390 : 570;
-    return `M${a.x},${a.y - 28} Q${cx},105 ${e.x},${e.y}`;
+    const dir = appl.az === 'a' ? 1 : -1;
+    if (appl.az === az) return `M${a.x + 24 * dir},${a.y - 6} L${e.x - 20 * dir},${e.y}`;
+    // 別 AZ のエンドポイントへはサブネット下側を回り込む曲線で描く
+    return `M${a.x + 24 * dir},${a.y + 10} Q${480 - 110 * dir},400 ${e.x - 18 * dir},${e.y + 10}`;
   }
 
   function renderDiagram() {
@@ -353,48 +367,35 @@
     const rs = s.routeServer;
     const best = fibFor(s);
     let g = '';
-    g += '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--rs)"/></marker></defs>';
-    g += `<rect class="svg-vpc" x="10" y="10" width="940" height="560" rx="12"/>`;
-    g += `<text class="svg-label-strong" x="24" y="32">VPC ${T.vpc.cidr}</text><text class="svg-small" x="24" y="48">${T.vpc.id}</text>`;
+    g += '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8c4fff"/></marker></defs>';
+    g += '<rect x="0" y="0" width="960" height="680" fill="#ffffff"/>';
 
-    // AZ & subnets
-    for (const [az, x] of [['a', 25], ['c', 495]]) {
-      g += `<rect class="svg-az" x="${x}" y="125" width="440" height="435" rx="10"/>`;
-      g += `<text class="svg-label" x="${x + 12}" y="143">アベイラビリティゾーン ${az === 'a' ? 'AZ-a' : 'AZ-c'}</text>`;
+    // グループ (AWS Cloud > Region > VPC > AZ > Private subnet)
+    g += group('grp-cloud', 10, 10, 940, 660, 'group-aws-cloud', 'AWS Cloud');
+    g += group('grp-region', 26, 44, 908, 614, 'group-region', 'Region', 'ap-northeast-1 (東京)');
+    g += group('grp-vpc', 42, 78, 876, 568, 'group-vpc', 'VPC', `${T.vpc.cidr} · ${T.vpc.id}`);
+    for (const [az, x] of [['a', 58], ['c', 492]]) {
+      g += group('grp-az', x, 200, 410, 432, null, 'Availability Zone', AZ_NAME[az]);
       const appl = T.subnets[`subnet-appl-${az}`];
       const work = T.subnets[`subnet-work-${az}`];
-      g += `<rect class="svg-subnet-appl" x="${x + 12}" y="152" width="416" height="170" rx="8"/>`;
-      g += `<text class="svg-small" x="${x + 22}" y="170">subnet-appl-${az} ${appl.cidr}</text>`;
-      g += `<rect class="svg-subnet-work" x="${x + 12}" y="340" width="416" height="208" rx="8"/>`;
-      g += `<text class="svg-small" x="${x + 22}" y="358">subnet-work-${az} ${work.cidr}</text>`;
+      g += group('grp-private', x + 14, 230, 382, 184, 'group-private-subnet', 'Private subnet', `subnet-appl-${az} · ${appl.cidr}`);
+      g += group('grp-private', x + 14, 424, 382, 194, 'group-private-subnet', 'Private subnet', `subnet-work-${az} · ${work.cidr}`);
     }
 
-    // Route Server
-    if (rs) {
-      g += `<rect class="svg-rs" x="370" y="36" width="220" height="64" rx="10"/>`;
-      g += `<text class="svg-rs-text" x="480" y="62" text-anchor="middle">Route Server</text>`;
-      g += `<text class="svg-small" x="480" y="80" text-anchor="middle">AS${rs.asn} ${rs.associated ? '· 関連付け済み' : '· 未関連付け'}${rs.persist ? ' · 永続化' : ''}</text>`;
-      if (s.persisted) g += `<text class="svg-small" x="480" y="94" text-anchor="middle" style="fill:var(--warn)">経路を保持中</text>`;
-    } else {
-      g += `<rect class="svg-rs ghost" x="370" y="36" width="220" height="64" rx="10"/>`;
-      g += `<text class="svg-label" x="480" y="72" text-anchor="middle">Route Server (未作成)</text>`;
-    }
-
-    // propagation links
+    // 伝播 (Route Server → ルートテーブル)
     for (const rtb of T.routeTables) {
       if (!s.propagations[rtb] || !rs) continue;
-      const endX = rtb === 'rtb-work-a' ? 415 : 545;
-      g += `<path class="prop-link" d="M480,100 V${POS.rtb[rtb].y} H${endX}" marker-end="url(#arrow)"/>`;
-    }
-    if (rs && Object.keys(s.propagations).length) {
-      g += `<text class="svg-legend" x="486" y="330" transform="rotate(90 486 330)">伝播</text>`;
+      const endX = rtb === 'rtb-work-a' ? 447 : 513;
+      g += `<path class="prop-link" d="M480,176 V520 H${endX}" marker-end="url(#arrow)"/>`;
     }
 
-    // endpoint links & BGP sessions
+    // エンドポイント ⇔ Route Server
     for (const ep of Object.values(s.endpoints)) {
       const p = POS.ep[ep.az];
-      g += `<path class="ep-link" d="M${p.x},${p.y} L${ep.az === 'a' ? 450 : 510},100"/>`;
+      g += `<path class="ep-link ${ep.up ? '' : 'down'}" d="M${p.x},${p.y - 20} L${ep.az === 'a' ? 462 : 498},156"/>`;
     }
+
+    // BGP セッション
     for (const peer of Object.values(s.peers)) {
       const appl = s.appliances[peer.applianceId];
       const ep = s.endpoints[peer.endpointId];
@@ -402,58 +403,81 @@
       g += `<path class="bgp ${cls}" d="${bgpPath(appl, ep.az)}"><title>${peer.id}: ${peer.state}</title></path>`;
     }
 
-    // endpoints
+    // VPC Route Server (専用アイコンがないため Amazon VPC Router アイコンで表現)
+    if (rs) {
+      g += `<rect class="rs-box" x="392" y="100" width="176" height="96" rx="4"/>`;
+      g += img('vpc-router', 480, 132, 40);
+      g += `<text class="d-name" x="480" y="168" text-anchor="middle">VPC Route Server</text>`;
+      g += `<text class="d-sub" x="480" y="182" text-anchor="middle">AS${rs.asn} · ${rs.associated ? 'VPC に関連付け済み' : '未関連付け'}</text>`;
+      if (rs.persist) g += `<text class="d-sub" x="480" y="194" text-anchor="middle" style="fill:${s.persisted ? '#b35c00' : '#5f6b7a'}">${s.persisted ? '経路を永続化して保持中' : '経路の永続化: 有効'}</text>`;
+    } else {
+      g += `<rect class="rs-box ghost" x="392" y="100" width="176" height="96" rx="4"/>`;
+      g += img('vpc-router', 480, 132, 40, 'opacity="0.25"');
+      g += `<text class="d-sub" x="480" y="172" text-anchor="middle">VPC Route Server (未作成)</text>`;
+    }
+
+    // Route Server エンドポイント (サブネット内の ENI)
     for (const az of ['a', 'c']) {
       const p = POS.ep[az];
       const ep = Object.values(s.endpoints).find((e) => e.az === az);
       if (ep) {
-        g += `<circle class="svg-ep ${ep.up ? '' : 'down'}" cx="${p.x}" cy="${p.y}" r="14"/>`;
-        g += `<text x="${p.x}" y="${p.y + 4}" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">EP</text>`;
-        g += `<text class="svg-small" x="${p.x}" y="${p.y + 30}" text-anchor="middle">${ep.ip}${ep.up ? '' : ' ✕'}</text>`;
+        g += img('elastic-network-interface', p.x, p.y, 36, ep.up ? '' : 'opacity="0.35"');
+        if (!ep.up) g += crossMark(p.x, p.y, 12);
+        g += `<text class="d-name" x="${p.x}" y="${p.y + 32}" text-anchor="middle">RS エンドポイント</text>`;
+        g += `<text class="d-sub" x="${p.x}" y="${p.y + 45}" text-anchor="middle">${ep.ip}${ep.up ? '' : ' (障害)'}</text>`;
       } else {
-        g += `<circle class="svg-ep-slot" cx="${p.x}" cy="${p.y}" r="14"/>`;
+        g += `<rect class="slot" x="${p.x - 18}" y="${p.y - 18}" width="36" height="36" rx="4"/>`;
+        g += `<text class="d-sub" x="${p.x}" y="${p.y + 32}" text-anchor="middle">エンドポイント未作成</text>`;
       }
     }
 
-    // appliances
+    // アプライアンス (EC2 インスタンス上のファイアウォール)
     for (const a of Object.values(s.appliances)) {
       const p = POS.appl[a.id];
-      const active = best && best.applianceId === a.id;
-      g += `<rect class="svg-appl ${a.up ? '' : 'down'} ${active && a.up ? 'active' : ''}" x="${p.x - 70}" y="${p.y - 28}" width="140" height="62" rx="8"/>`;
-      g += `<text class="svg-label-strong" x="${p.x}" y="${p.y - 9}" text-anchor="middle">🛡 ${esc(a.name)}</text>`;
-      g += `<text class="svg-small" x="${p.x}" y="${p.y + 7}" text-anchor="middle">${a.ip} · AS${a.asn}</text>`;
-      g += `<text class="svg-small" x="${p.x}" y="${p.y + 22}" text-anchor="middle">${a.eni}</text>`;
-      const status = !a.up ? ['停止中', 'var(--err)'] : active ? ['ACTIVE', 'var(--ok)'] : [a.advertise ? 'スタンバイ' : '広告停止', 'var(--muted)'];
-      g += `<text x="${p.x}" y="${p.y + 50}" text-anchor="middle" style="fill:${status[1]};font-size:12px;font-weight:700">${status[0]}</text>`;
+      const active = best && best.applianceId === a.id && a.up;
+      if (active) g += `<rect class="active-ring" x="${p.x - 30}" y="${p.y - 30}" width="60" height="60" rx="6"/>`;
+      g += img('ec2-instance', p.x, p.y, 44, a.up ? '' : 'opacity="0.35"');
+      if (!a.up) g += crossMark(p.x, p.y, 14);
+      g += `<text class="d-name" x="${p.x}" y="${p.y + 44}" text-anchor="middle">${esc(a.name)}</text>`;
+      g += `<text class="d-sub" x="${p.x}" y="${p.y + 58}" text-anchor="middle">${a.ip} · AS${a.asn}</text>`;
+      g += `<text class="d-sub" x="${p.x}" y="${p.y + 71}" text-anchor="middle">${a.eni}</text>`;
+      const status = !a.up ? ['停止中', '#d13212'] : active ? ['ACTIVE', '#1d8102'] : [a.advertise ? 'スタンバイ' : '広告停止', '#5f6b7a'];
+      g += `<text x="${p.x}" y="${p.y + 88}" text-anchor="middle" style="fill:${status[1]};font-size:12px;font-weight:700">${status[0]}</text>`;
     }
 
-    // route tables
+    // ルートテーブル
     for (const rtb of T.routeTables) {
       const p = POS.rtb[rtb];
       const table = s.routeTables[rtb] || { routes: [{ dest: T.vpc.cidr, target: 'local' }] };
-      const w = 190;
-      const h = 30 + table.routes.length * 17;
-      g += `<rect class="svg-rtb ${s.propagations[rtb] ? 'propagated' : ''}" x="${p.x - w / 2}" y="${p.y - 34}" width="${w}" height="${h}" rx="6"/>`;
-      g += `<text class="svg-label-strong" x="${p.x - w / 2 + 10}" y="${p.y - 16}" style="font-size:12px">📋 ${rtb}</text>`;
+      const w = 246;
+      const x = p.x - w / 2;
+      const h = 44 + table.routes.length * 16;
+      g += `<rect class="rtb-box ${s.propagations[rtb] ? 'propagated' : ''}" x="${x}" y="${p.y}" width="${w}" height="${h}" rx="4"/>`;
+      g += `<image href="${ICON('route-table')}" x="${x + 8}" y="${p.y + 8}" width="24" height="24"/>`;
+      g += `<text class="d-name" x="${x + 38}" y="${p.y + 20}">Route table</text>`;
+      g += `<text class="d-sub" x="${x + 38}" y="${p.y + 32}">${rtb}${s.propagations[rtb] ? ' · 伝播: 有効' : ''}</text>`;
       table.routes.forEach((r, i) => {
-        const target = r.target === 'local' ? 'local' : `${s.appliances[r.applianceId].name.replace('Firewall', 'FW')}${r.persisted ? '*' : ''}`;
-        const style = r.origin === 'route-server' ? `style="fill:${r.persisted ? 'var(--warn)' : 'var(--rs)'};font-weight:700"` : '';
-        g += `<text class="svg-small" ${style} x="${p.x - w / 2 + 10}" y="${p.y + 2 + i * 17}">${r.dest} → ${target}</text>`;
+        const target = r.target === 'local' ? 'local' : `${r.target}${r.persisted ? ' *' : ''}`;
+        const style = r.origin === 'route-server' ? `style="fill:${r.persisted ? '#b35c00' : '#8c4fff'};font-weight:700"` : '';
+        g += `<text class="d-mono" ${style} x="${x + 10}" y="${p.y + 54 + i * 16}">${r.dest} → ${target}</text>`;
       });
     }
 
-    // clients
+    // ワークロード (EC2 インスタンス)
     for (const c of Object.values(s.clients)) {
       const p = POS.client[c.id];
       const last = s.traffic[c.id] && s.traffic[c.id].last;
-      g += `<rect class="svg-client" x="${p.x - 55}" y="${p.y - 26}" width="110" height="52" rx="8"/>`;
-      g += `<text class="svg-label-strong" x="${p.x}" y="${p.y - 6}" text-anchor="middle">💻 ${c.name}</text>`;
-      g += `<text class="svg-small" x="${p.x}" y="${p.y + 10}" text-anchor="middle">${c.ip}</text>`;
-      if (last) g += `<text x="${p.x}" y="${p.y + 44}" text-anchor="middle" style="fill:${last.ok ? 'var(--ok)' : 'var(--err)'};font-size:12px;font-weight:700">${last.ok ? '通信OK' : '通信NG'}</text>`;
+      g += img('ec2-instance', p.x, p.y, 44);
+      g += `<text class="d-name" x="${p.x}" y="${p.y + 44}" text-anchor="middle">${c.name}</text>`;
+      g += `<text class="d-sub" x="${p.x}" y="${p.y + 58}" text-anchor="middle">${c.ip}</text>`;
+      if (last) g += `<text x="${p.x}" y="${p.y + 76}" text-anchor="middle" style="fill:${last.ok ? '#1d8102' : '#d13212'};font-size:12px;font-weight:700">${last.ok ? '通信OK' : '通信NG'}</text>`;
     }
 
-    g += `<text class="svg-legend" x="940" y="30" text-anchor="end">宛先: ${T.destination} (VIP) ／ 線: <tspan style="fill:var(--ok)">━ BGP確立</tspan> <tspan style="fill:var(--warn)">┅ 接続中/無応答</tspan> <tspan style="fill:var(--err)">┅ ダウン</tspan></text>`;
     setHTML($('#diagram-static'), g);
+  }
+
+  function crossMark(x, y, r) {
+    return `<g class="svg-x"><line x1="${x - r}" y1="${y - r}" x2="${x + r}" y2="${y + r}"/><line x1="${x - r}" y1="${y + r}" x2="${x + r}" y2="${y - r}"/></g>`;
   }
 
   // ---------- パケットアニメーション ----------
@@ -472,10 +496,10 @@
       const c = POS.client[id];
       const rtbId = T.subnets[state.clients[id].subnetId].routeTable;
       const r = POS.rtb[rtbId];
-      const pts = [{ x: c.x, y: c.y }, { x: r.x, y: r.y - 34 }];
+      const pts = [{ x: c.x, y: c.y }, { x: r.x, y: r.y + 20 }];
       if (last.via) {
         const a = POS.appl[last.via];
-        pts.push({ x: a.x, y: a.y + 34 });
+        pts.push({ x: a.x, y: a.y + 22 });
       }
       packets.push({ pts, ok: last.ok, born: now, dur: 900 });
     }
