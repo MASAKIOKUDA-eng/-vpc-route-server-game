@@ -58,10 +58,10 @@
 
         <h2>登場人物 (構成要素)</h2>
         <dl class="glossary">
-          <div><dt>Route Server</dt><dd>本体。Amazon 側の ASN を持ち、VPC に <em>関連付け (associate)</em> して使います。</dd></div>
-          <div><dt>Route Server エンドポイント</dt><dd>サブネット内に作られる BGP の「話し相手」。IP アドレスを持ちます。冗長化のため <strong>異なる AZ に 2 つ以上</strong> 作るのが基本です。</dd></div>
-          <div><dt>Route Server ピア</dt><dd>エンドポイントと BGP セッションを張る相手 (アプライアンス) の定義。ピアの IP、ASN、障害検知方式 (BFD / BGP キープアライブ) を指定します。</dd></div>
-          <div><dt>伝播 (propagation)</dt><dd>どのルートテーブルに経路を書き込むかの設定。有効化したルートテーブルにだけ経路が入ります。</dd></div>
+          <div><dt><img src="assets/aws/vpc-router.svg" alt="">Route Server</dt><dd>本体。Amazon 側の ASN を持ち、VPC に <em>関連付け (associate)</em> して使います。</dd></div>
+          <div><dt><img src="assets/aws/elastic-network-interface.svg" alt="">Route Server エンドポイント</dt><dd>サブネット内に作られる BGP の「話し相手」。サブネットの IP アドレスを持つネットワークインターフェイス (ENI) として作られます。冗長化のため <strong>異なる AZ に 2 つ以上</strong> 作るのが基本です。</dd></div>
+          <div><dt><img src="assets/aws/ec2-instance.svg" alt="">Route Server ピア</dt><dd>エンドポイントと BGP セッションを張る相手 (アプライアンス) の定義。ピアの IP、ASN、障害検知方式 (BFD / BGP キープアライブ) を指定します。</dd></div>
+          <div><dt><img src="assets/aws/route-table.svg" alt="">伝播 (propagation)</dt><dd>どのルートテーブルに経路を書き込むかの設定。有効化したルートテーブルにだけ経路が入ります。</dd></div>
           <div><dt>RIB</dt><dd>Routing Information Base。ピアから受け取った <strong>全ての</strong> 経路。</dd></div>
           <div><dt>FIB</dt><dd>Forwarding Information Base。RIB から選ばれた <strong>ベストパス</strong>。これがルートテーブルに反映されます。</dd></div>
         </dl>
@@ -135,10 +135,18 @@
       <div class="lab-grid">
         <div class="lab-main">
           <div class="panel diagram-panel">
-            <svg id="diagram" viewBox="0 0 960 580" role="img" aria-label="VPC 構成図">
+            <svg id="diagram" viewBox="0 0 960 680" role="img" aria-label="VPC 構成図">
               <g id="diagram-static"></g>
               <g id="diagram-packets"></g>
             </svg>
+            <div class="diagram-legend">
+              <span><span class="ln" style="border-color:var(--ok)"></span>BGP 確立</span>
+              <span><span class="ln" style="border-color:var(--warn);border-top-style:dashed"></span>接続中 / 無応答</span>
+              <span><span class="ln" style="border-color:var(--err);border-top-style:dotted"></span>BGP ダウン</span>
+              <span><span class="ln" style="border-color:var(--grp-vpc);border-top-style:dashed"></span>伝播 (ルートテーブルへ書き込み)</span>
+              <span>宛先: 192.168.100.10 (VIP)</span>
+              <span>アイコン: AWS Architecture Icons (Route Server は専用アイコンがないため VPC Router で表現)</span>
+            </div>
             <div id="traffic-strip" class="traffic-strip"></div>
           </div>
 
