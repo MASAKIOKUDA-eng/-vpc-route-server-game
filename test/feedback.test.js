@@ -154,3 +154,21 @@ test('feedback ラベルのない Issue や dry run では書き込まない', a
   assert.equal(out.result.actionable, true);
   assert.ok(b.calls.every((c) => c.method === 'GET'));
 });
+
+test('index.html の GitHub リンクは JavaScript なしでも正しいリンク先を持つ', () => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  const anchors = [...html.matchAll(/<a\b[^>]*data-gh-link="([^"]+)"[^>]*>/g)];
+  assert.ok(anchors.length >= 4);
+  const base = `https://github.com/${F.REPO}`;
+  const expected = {
+    repo: base,
+    issues: `${base}/issues`,
+    feedback: `${base}/issues?q=${encodeURIComponent('is:issue label:feedback')}`,
+    tasks: `${base}/issues?q=${encodeURIComponent('is:issue is:open label:課題')}`,
+  };
+  for (const [tag, kind] of anchors.map((m) => [m[0], m[1]])) {
+    const href = /href="([^"]+)"/.exec(tag);
+    assert.ok(href, `${kind} に href がありません`);
+    assert.equal(href[1], expected[kind], kind);
+  }
+});
