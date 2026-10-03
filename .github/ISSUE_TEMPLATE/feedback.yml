@@ -1,0 +1,44 @@
+name: フィードバック
+description: Route Server Lab を使った感想・不具合・改善要望を送る
+title: "[フィードバック] "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Route Server Lab を使っていただきありがとうございます。
+        アプリの「💬 フィードバック」から開いた場合は、下の項目が入力済みです。内容を確認して送信してください。
+        送信後、自動で内容を判定し、課題があれば改善用の Issue を起票します。
+  - type: input
+    id: rating
+    attributes:
+      label: 満足度
+      description: "5 - とても良い / 4 - 良い / 3 - ふつう / 2 - 不満 / 1 - とても不満"
+      placeholder: "例: 4 - 良い"
+  - type: input
+    id: category
+    attributes:
+      label: カテゴリ
+      description: "不具合 / 内容の誤り / 分かりにくい / 改善要望 / 感想・その他 のいずれか"
+      placeholder: "例: 分かりにくい"
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: 該当箇所
+      description: "しくみを知る (解説) / ラボで体験 (シミュレーター) / 理解度クイズ / 全体・その他"
+      placeholder: "例: ラボで体験 (シミュレーター)"
+  - type: textarea
+    id: message
+    attributes:
+      label: 内容
+      description: 気づいたこと、困ったこと、ほしい機能などを自由に書いてください。
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 利用状況（自動入力）
+      description: アプリから送信した場合、ミッションの進み具合やブラウザ情報が自動で入ります。個人情報は含まれません。
+      render: text

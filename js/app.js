@@ -158,6 +158,7 @@
         <div class="btn-group" style="margin-top:10px">
           <button class="btn" data-mission="restart">ミッションを最初から</button>
           <button class="btn primary" data-goto="quiz">クイズに挑戦 →</button>
+          <button class="btn" data-open-feedback>💬 感想を送る</button>
         </div>`;
     } else {
       const m = MISSIONS[missionIdx];
@@ -761,12 +762,119 @@
     const answered = Object.keys(quizAnswers).length;
     const correct = Object.entries(quizAnswers).filter(([i, a]) => QUIZ[i].a === a).length;
     $('#quiz-score').innerHTML = answered === QUIZ.length
-      ? `スコア: ${correct} / ${QUIZ.length} ${correct === QUIZ.length ? '🏆 完璧です！' : ''}<div style="margin-top:10px"><button class="btn" id="quiz-retry">もう一度挑戦</button></div>`
+      ? `スコア: ${correct} / ${QUIZ.length} ${correct === QUIZ.length ? '🏆 完璧です！' : ''}<div style="margin-top:10px"><button class="btn" id="quiz-retry">もう一度挑戦</button> <button class="btn" data-open-feedback>💬 感想を送る</button></div>`
       : `${answered} / ${QUIZ.length} 問回答済み`;
   }
 
+  // ================= フィードバック =================
+  const FB = window.FeedbackKit;
+  const VIEW_TO_AREA = { learn: 'learn', lab: 'lab', quiz: 'quiz' };
+  let fbRating = null;
+
+  function feedbackContext() {
+    const rs = state.routeServer;
+    const peers = Object.values(state.peers);
+    const mission = freeMode ? '自由モード'
+      : missionIdx >= MISSIONS.length ? '全ミッションクリア'
+        : `${missionIdx + 1} / ${MISSIONS.length} 「${MISSIONS[missionIdx].title}」${missionDone ? ' (クリア済み)' : ''}`;
+    const answered = Object.keys(quizAnswers).length;
+    const correct = Object.entries(quizAnswers).filter(([i, a]) => QUIZ[i].a === a).length;
+    return [
+      `画面: ${{ learn: 'しくみを知る', lab: 'ラボで体験', quiz: '理解度クイズ' }[currentView] || currentView}`,
+      `ミッション: ${mission}`,
+      `シミュレーション時間: ${fmtTime(state.time)}`,
+      `構成: Route Server ${rs ? `作成済み (${rs.associated ? 'VPC 関連付け済み' : '未関連付け'}${rs.persist ? ', 永続化あり' : ''})` : '未作成'}` +
+        ` / エンドポイント ${Object.keys(state.endpoints).length} / ピア ${peers.length} (確立 ${peers.filter((p) => p.state === 'established').length})` +
+        ` / 伝播 ${Object.keys(state.propagations).length}`,
+      `クイズ: ${answered} / ${QUIZ.length} 問回答 (正解 ${correct})`,
+      `画面サイズ: ${window.innerWidth}x${window.innerHeight}`,
+      `ブラウザ: ${navigator.userAgent}`,
+    ].join('\n');
+  }
+
+  function renderFeedbackForm() {
+    $('#fb-stars').innerHTML = FB.RATINGS.slice().reverse().map((r) =>
+      `<button type="button" class="fb-star" data-rating="${r.value}" aria-pressed="${fbRating === r.value}">${esc(r.label)}</button>`).join('');
+    const cat = $('#fb-category').value;
+    const hint = FB.CATEGORIES.find((c) => c.id === cat);
+    $('#fb-category-hint').textContent = hint ? hint.hint : '';
+    const ctx = $('#fb-context');
+    ctx.hidden = !$('#fb-include-context').checked;
+    ctx.textContent = feedbackContext();
+  }
+
+  function openFeedback() {
+    const dlg = $('#feedback-dialog');
+    if (!$('#fb-category').options.length) {
+      $('#fb-category').innerHTML = FB.CATEGORIES.map((c) => `<option value="${c.id}">${esc(c.label)}</option>`).join('');
+      $('#fb-area').innerHTML = FB.AREAS.map((a) => `<option value="${a.id}">${esc(a.label)}</option>`).join('');
+    }
+    $('#fb-area').value = VIEW_TO_AREA[currentView] || 'other';
+    renderFeedbackForm();
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else dlg.setAttribute('open', '');
+    $('#fb-message').focus();
+  }
+
+  function submitFeedback() {
+    const message = $('#fb-message').value.trim();
+    if (!message) {
+      toast('内容を入力してください', true);
+      return false;
+    }
+    const url = FB.buildIssueUrl({
+      rating: fbRating,
+      category: $('#fb-category').value,
+      area: $('#fb-area').value,
+      message,
+      context: $('#fb-include-context').checked ? feedbackContext() : '',
+    });
+    window.open(url, '_blank', 'noopener');
+    toast('GitHub の画面で内容を確認して送信してください');
+    $('#fb-message').value = '';
+    fbRating = null;
+    return true;
+  }
+
+  // GitHub のリポジトリ・Issue ページへのリンク (リポジトリ名は feedback.js の REPO に一元化)
+  function initGitHubLinks() {
+    const base = `https://github.com/${FB.REPO}`;
+    const q = (query) => `${base}/issues?q=${encodeURIComponent(query)}`;
+    const links = {
+      repo: base,
+      issues: `${base}/issues`,
+      feedback: q('is:issue label:feedback'),
+      tasks: q('is:issue is:open label:課題'),
+    };
+    document.querySelectorAll('[data-gh-link]').forEach((a) => { a.href = links[a.dataset.ghLink]; });
+  }
+
+  function initFeedback() {
+    initGitHubLinks();
+    const dlg = $('#feedback-dialog');
+    $('#btn-feedback').addEventListener('click', openFeedback);
+    $('#fb-stars').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-rating]');
+      if (!b) return;
+      const v = Number(b.dataset.rating);
+      fbRating = fbRating === v ? null : v;
+      renderFeedbackForm();
+    });
+    $('#fb-category').addEventListener('change', renderFeedbackForm);
+    $('#fb-include-context').addEventListener('change', renderFeedbackForm);
+    $('#feedback-form').addEventListener('submit', (e) => {
+      const submitter = e.submitter;
+      if (submitter && submitter.value === 'cancel') return;
+      if (!submitFeedback()) e.preventDefault();
+    });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+  }
+
   // ================= 初期化 =================
+  let currentView = 'learn';
+
   function showView(name) {
+    currentView = name;
     document.querySelectorAll('.view').forEach((v) => { v.hidden = v.dataset.view !== name; });
     document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.view === name)));
     window.scrollTo(0, 0);
@@ -775,6 +883,7 @@
   function init() {
     document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showView(t.dataset.view)));
     document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-open-feedback]')) openFeedback();
       const go = e.target.closest('[data-goto]');
       if (go) showView(go.dataset.goto);
       const m = e.target.closest('[data-mission]');
@@ -823,6 +932,7 @@
       renderAll();
     }, 100);
 
+    initFeedback();
     startMission(0);
     renderSpeed();
     renderQuiz();

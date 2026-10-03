@@ -20,6 +20,7 @@
       <button class="tab" role="tab" data-view="learn" aria-selected="true">1. しくみを知る</button>
       <button class="tab" role="tab" data-view="lab" aria-selected="false">2. ラボで体験</button>
       <button class="tab" role="tab" data-view="quiz" aria-selected="false">3. 理解度クイズ</button>
+      <button class="btn feedback-btn" id="btn-feedback" type="button">💬 フィードバック</button>
     </nav>
   </header>
 
@@ -179,9 +180,55 @@
     </section>
   </main>
 
+  <footer class="site-footer">
+    <nav class="footer-links" aria-label="GitHub のリンク">
+      <a data-gh-link="repo" target="_blank" rel="noopener">GitHub リポジトリ ↗</a>
+      <a data-gh-link="feedback" target="_blank" rel="noopener">みんなのフィードバック ↗</a>
+      <a data-gh-link="tasks" target="_blank" rel="noopener">課題 (改善予定) の一覧 ↗</a>
+      <a data-gh-link="issues" target="_blank" rel="noopener">すべての Issue ↗</a>
+    </nav>
+    <p class="footer-note">フィードバックや課題は GitHub の Issue で公開されています。</p>
+  </footer>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="fb-title">
+    <form id="feedback-form" method="dialog">
+      <h2 id="fb-title">フィードバックを送る</h2>
+      <p class="fb-lead">感想・不具合・分かりにくかった点を教えてください。内容は自動で判定され、課題があれば改善用の Issue として起票されます。</p>
+
+      <fieldset class="fb-rating">
+        <legend>満足度</legend>
+        <div class="fb-stars" id="fb-stars"></div>
+      </fieldset>
+
+      <label class="fb-field">カテゴリ
+        <select id="fb-category" required></select>
+        <span class="fb-hint" id="fb-category-hint"></span>
+      </label>
+
+      <label class="fb-field">該当箇所
+        <select id="fb-area"></select>
+      </label>
+
+      <label class="fb-field"><span>内容 <span class="fb-req">必須</span></span>
+        <textarea id="fb-message" rows="5" required placeholder="例: ミッション 7 で Firewall-A を停止しても切り替わらず、次に進めませんでした。"></textarea>
+      </label>
+
+      <label class="fb-check"><input type="checkbox" id="fb-include-context" checked> 利用状況 (ミッションの進み具合・ブラウザ情報) を添付する</label>
+      <pre class="fb-context" id="fb-context"></pre>
+
+      <p class="fb-note">送信ボタンを押すと GitHub の Issue 作成画面が新しいタブで開きます (GitHub アカウントが必要です)。内容を確認して「Create」を押すと送信完了です。Issue は公開されるので、個人情報は書かないでください。 <a data-gh-link="feedback" target="_blank" rel="noopener">これまでのフィードバックを見る ↗</a></p>
+
+      <div class="fb-actions">
+        <button class="btn" value="cancel" formnovalidate>キャンセル</button>
+        <button class="btn primary" id="fb-submit" value="submit">GitHub で送信する ↗</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="js/sim.js"></script>
+  <script src="js/feedback.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
