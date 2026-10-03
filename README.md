@@ -47,13 +47,42 @@ index.html        画面
 css/style.css     スタイル (白基調)
 assets/aws/       構成図用の AWS Architecture Icons
 js/sim.js         シミュレーションエンジン (DOM 非依存、Node.js でもテスト可能)
-js/app.js         UI・ミッション・クイズ
-test/sim.test.js  エンジンのテスト
+js/app.js         UI・ミッション・クイズ・フィードバックフォーム
+js/feedback.js    フィードバックの選択肢・URL 生成・判定ルール (ブラウザと Actions で共用)
+scripts/triage-feedback.js          フィードバックを判定して課題 Issue を起票するスクリプト
+.github/ISSUE_TEMPLATE/feedback.yml フィードバック用の Issue フォーム
+.github/workflows/feedback-triage.yml 判定を実行する GitHub Actions
+test/             テスト
 ```
 
 ```bash
 npm test
 ```
+
+## フィードバック → 課題 Issue の起票
+
+```
+アプリの「💬 フィードバック」
+   │  満足度・カテゴリ・該当箇所・内容・利用状況を入力
+   ▼
+GitHub の Issue フォーム (feedback.yml) が入力済みで開く → 利用者が送信
+   │  feedback ラベル付きの Issue が作成される
+   ▼
+GitHub Actions (feedback-triage.yml) がルールで判定
+   ├─ 課題あり → 課題 Issue を起票 (ラベル: 課題 / from-feedback / 種類 / 優先度)
+   │             元のフィードバックにお礼と課題 Issue へのリンクをコメント
+   ├─ 課題なし → お礼をコメントし feedback:no-action ラベル
+   └─ 内容不足 → 詳しく教えてほしいとコメントし needs-info ラベル
+```
+
+- 送信には GitHub アカウントが必要です。Issue は公開されます。
+- 判定ルールは `js/feedback.js` の `triage()` にあります。
+  - カテゴリが「不具合」「内容の誤り」「分かりにくい」「改善要望」なら課題とします。
+  - 「感想・その他」でも、内容にキーワード (「動かない」「間違い」「分かりにくい」「ほしい」など) を含むか、満足度が 2 以下なら課題とします。
+  - 優先度は種類と満足度で決めます (不具合・内容の誤り × 満足度 2 以下 = 高)。
+- 判定済みの Issue には `triaged` ラベルが付き、二重に起票されません。判定し直すときは `triaged` ラベルを外し、Actions の「フィードバックの判定と課題の起票」を Issue 番号を指定して手動実行します。
+- 必要なラベルは初回実行時に自動で作成されます。シークレットの追加は不要です (Actions 標準の `GITHUB_TOKEN` を使います)。
+- 判定だけを試す: `DRY_RUN=1 GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/repo ISSUE_NUMBER=1 node scripts/triage-feedback.js`
 
 ## 構成図について
 

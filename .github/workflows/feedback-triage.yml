@@ -1,0 +1,35 @@
+name: フィードバックの判定と課題の起票
+
+on:
+  issues:
+    types: [opened, labeled]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 判定し直すフィードバック Issue の番号
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+# 作成時に opened と labeled が同時に届くので、同じ Issue の処理は 1 件ずつ実行する
+concurrency:
+  group: feedback-triage-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'feedback')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: フィードバックを判定して課題 Issue を起票
+        run: node scripts/triage-feedback.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
