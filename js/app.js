@@ -836,7 +836,21 @@
     return true;
   }
 
+  // GitHub のリポジトリ・Issue ページへのリンク (リポジトリ名は feedback.js の REPO に一元化)
+  function initGitHubLinks() {
+    const base = `https://github.com/${FB.REPO}`;
+    const q = (query) => `${base}/issues?q=${encodeURIComponent(query)}`;
+    const links = {
+      repo: base,
+      issues: `${base}/issues`,
+      feedback: q('is:issue label:feedback'),
+      tasks: q('is:issue is:open label:課題'),
+    };
+    document.querySelectorAll('[data-gh-link]').forEach((a) => { a.href = links[a.dataset.ghLink]; });
+  }
+
   function initFeedback() {
+    initGitHubLinks();
     const dlg = $('#feedback-dialog');
     $('#btn-feedback').addEventListener('click', openFeedback);
     $('#fb-stars').addEventListener('click', (e) => {
