@@ -9,7 +9,7 @@ AWS の **VPC Route Server** を、ブラウザ上で手を動かしながら学
 ビルドは不要です。`index.html` をブラウザで開くか、ローカルサーバーを起動してください。
 
 ```bash
-npm start            # = python3 -m http.server 8000
+npm start            # = python3 -m http.server 8000 --bind 127.0.0.1
 # → http://localhost:8000 を開く
 ```
 
@@ -81,6 +81,7 @@ GitHub Actions (feedback-triage.yml) がルールで判定
   - 「感想・その他」でも、内容にキーワード (「動かない」「間違い」「分かりにくい」「ほしい」など) を含むか、満足度が 2 以下なら課題とします。
   - 優先度は種類と満足度で決めます (不具合・内容の誤り × 満足度 2 以下 = 高)。
 - 判定済みの Issue には `triaged` ラベルが付き、二重に起票されません。判定し直すときは `triaged` ラベルを外し、Actions の「フィードバックの判定と課題の起票」を Issue 番号を指定して手動実行します。
+- スパム対策として、同じ投稿者から 24 時間に自動起票する課題は 3 件までです (リポジトリの関係者は対象外)。超えた分には `feedback:rate-limited` ラベルが付き、起票を保留します。
 - 必要なラベルは初回実行時に自動で作成されます。シークレットの追加は不要です (Actions 標準の `GITHUB_TOKEN` を使います)。
 - 判定だけを試す: `DRY_RUN=1 GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/repo ISSUE_NUMBER=1 node scripts/triage-feedback.js`
 
@@ -90,6 +91,10 @@ GitHub Actions (feedback-triage.yml) がルールで判定
 AWS Cloud → Region → VPC → Availability Zone → Private subnet のグループを入れ子にして描いています。
 VPC Route Server には専用アイコンがないため、Amazon VPC の Router アイコンで表しています。
 Route Server エンドポイントはサブネット内の ENI として作られるため、Elastic network interface アイコンを使っています。
+
+## セキュリティ
+
+対策の内容と脆弱性の報告方法は [SECURITY.md](SECURITY.md) を参照してください。
 
 ## 注意
 

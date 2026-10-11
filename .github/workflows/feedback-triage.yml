@@ -8,10 +8,10 @@ on:
       issue_number:
         description: 判定し直すフィードバック Issue の番号
         required: true
+        type: number
 
-permissions:
-  contents: read
-  issues: write
+# 既定ではすべての権限を外し、必要な権限だけをジョブに与える
+permissions: {}
 
 # 作成時に opened と labeled が同時に届くので、同じ Issue の処理は 1 件ずつ実行する
 concurrency:
@@ -23,11 +23,15 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.issue.labels.*.name, 'feedback')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # サードパーティのアクションはタグではなくコミット SHA で固定する (改ざん対策)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          node-version: 20
+          persist-credentials: false
+      # Issue の本文などの外部入力はシェルに埋め込まず、スクリプトが API から読み取る
       - name: フィードバックを判定して課題 Issue を起票
         run: node scripts/triage-feedback.js
         env:

@@ -189,11 +189,20 @@
       kind,
       labels: [...KINDS[kind].labels, `priority:${priority}`],
       priority,
-      title: `[課題] ${KINDS[kind].label}: ${summarize(message)}`,
+      title: `[課題] ${KINDS[kind].label}: ${summarize(message).replace(/@/g, '@\u200b')}`,
     };
   }
 
   const PRIORITY_LABEL = { high: '高', medium: '中', low: '低' };
+
+  // 課題 Issue に転記する長さの上限 (GitHub の本文上限 65,536 文字を超えて起票に失敗しないように)
+  const MAX_MESSAGE_CHARS = 5000;
+  const MAX_CONTEXT_CHARS = 2000;
+
+  function truncate(text, max) {
+    const t = String(text);
+    return t.length > max ? `${t.slice(0, max)}\n…(長すぎるため以降を省略)` : t;
+  }
 
   // メンション (@user) で通知が飛ばないようにし、引用として整形する
   function quote(text) {
@@ -217,7 +226,7 @@
       `<!-- feedback-triage: source=#${sourceNumber} -->`,
       '## フィードバックの内容',
       '',
-      quote(result.message),
+      quote(truncate(result.message, MAX_MESSAGE_CHARS)),
       '',
       '| 項目 | 内容 |',
       '| --- | --- |',
@@ -229,7 +238,7 @@
       '',
       '## 利用状況',
       '',
-      fields.context ? fence(fields.context) : '(なし)',
+      fields.context ? fence(truncate(fields.context, MAX_CONTEXT_CHARS)) : '(なし)',
       '',
       '---',
       `このIssueはフィードバック #${sourceNumber} からルールに基づいて自動で起票されました。判定が誤っている場合は閉じてください。`,

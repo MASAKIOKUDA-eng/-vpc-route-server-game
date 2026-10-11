@@ -1,0 +1,7 @@
+# GitHub Actions のバージョン (コミット SHA で固定) を Dependabot で定期的に更新する
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
