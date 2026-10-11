@@ -172,3 +172,48 @@ test('index.html の GitHub リンクは JavaScript なしでも正しいリン�
     assert.equal(href[1], expected[kind], kind);
   }
 });
+
+// ---------- セキュリティ ----------
+test('同じ投稿者からの大量フィードバックは 24 時間に 3 件までしか自動起票しない', async () => {
+  const now = Date.parse('2026-10-11T12:00:00Z');
+  const recent = [1, 2, 3].map((n) => ({ number: n, created_at: '2026-10-11T08:00:00Z' }));
+  const issue = { number: 20, user: { login: 'spammer' }, author_association: 'NONE', labels: [{ name: 'feedback' }], body: formBody({ category: '不具合', message: '動かない動かない' }) };
+  const { api, calls } = fakeGitHub(issue);
+  const wrapped = async (method, path, body) => {
+    if (method === 'GET' && path.includes('/issues?')) {
+      assert.ok(path.includes('creator=spammer'));
+      return recent;
+    }
+    return api(method, path, body);
+  };
+  const out = await triageIssue({ api: wrapped, repo, issueNumber: 20, now, log: () => {} });
+  assert.equal(out.rateLimited, true);
+  assert.equal(calls.filter((c) => c.method === 'POST' && c.path === `/repos/${repo}/issues`).length, 0);
+  assert.ok(issue.labels.some((l) => l.name === 'feedback:rate-limited'));
+
+  // 24 時間より前の起票は数えない / リポジトリの関係者は対象外
+  const old = recent.map((r) => ({ ...r, created_at: '2026-10-09T08:00:00Z' }));
+  for (const [list, assoc] of [[old, 'NONE'], [recent, 'OWNER']]) {
+    const i2 = { ...issue, number: 21, author_association: assoc, labels: [{ name: 'feedback' }] };
+    const g = fakeGitHub(i2);
+    const w = async (m, p, b) => (m === 'GET' && p.includes('/issues?') ? list : g.api(m, p, b));
+    const o = await triageIssue({ api: w, repo, issueNumber: 21, now, log: () => {} });
+    assert.ok(o.created, `${assoc} は起票される`);
+  }
+});
+
+test('不正な Issue 番号やリポジトリ名は API を呼ぶ前に拒否する', async () => {
+  const api = async () => { throw new Error('呼ばれてはいけない'); };
+  await assert.rejects(triageIssue({ api, repo, issueNumber: NaN }), /不正な Issue 番号/);
+  await assert.rejects(triageIssue({ api, repo, issueNumber: '1/../../x' }), /不正な Issue 番号/);
+  await assert.rejects(triageIssue({ api, repo: 'a/b/../c', issueNumber: 1 }), /不正なリポジトリ名/);
+});
+
+test('長すぎる投稿は課題 Issue の本文上限を超えないよう切り詰め、タイトルのメンションも無効化する', () => {
+  const fields = { message: '@admin 不具合です ' + 'あ'.repeat(70000), context: 'い'.repeat(70000) };
+  const r = F.triage({ category: '不具合', ...fields });
+  const body = F.buildTaskIssueBody(r, fields, 1);
+  assert.ok(body.length < 65536, `length ${body.length}`);
+  assert.ok(body.includes('長すぎるため以降を省略'));
+  assert.ok(!r.title.includes('@admin'));
+});

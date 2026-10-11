@@ -20,6 +20,7 @@ const LABELS = {
   'feedback:issue-created': { color: 'd93f0b', description: 'フィードバックから課題 Issue を起票済み' },
   'feedback:no-action': { color: 'cfd3d7', description: 'フィードバックに課題は見つからなかった' },
   'needs-info': { color: 'fbca04', description: '判定に必要な情報が不足している' },
+  'feedback:rate-limited': { color: 'e99695', description: '短時間の大量投稿のため自動起票を保留' },
   '課題': { color: 'b60205', description: 'フィードバックから起票された改善課題' },
   'from-feedback': { color: 'bfdadc', description: 'フィードバックをもとに自動起票' },
   bug: { color: 'd73a4a', description: '不具合' },
@@ -30,6 +31,11 @@ const LABELS = {
   'priority:medium': { color: 'fbca04', description: '優先度: 中' },
   'priority:low': { color: '0e8a16', description: '優先度: 低' },
 };
+
+// 同じ投稿者のフィードバックから 24 時間に自動起票する課題の上限 (スパムによる大量起票の防止)
+const MAX_TASKS_PER_AUTHOR_PER_DAY = 3;
+// リポジトリの関係者は上限の対象外
+const TRUSTED_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
 
 function githubApi(token, fetchImpl = fetch) {
   return async function api(method, path, body) {
@@ -44,7 +50,12 @@ function githubApi(token, fetchImpl = fetch) {
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { message: text.slice(0, 200) };
+    }
     if (!res.ok) {
       const err = new Error(`${method} ${path} -> ${res.status}: ${data && data.message}`);
       err.status = res.status;
@@ -69,7 +80,20 @@ async function ensureLabels(api, repo, names) {
  * 1 件のフィードバック Issue を処理する。
  * 戻り値: { skipped, reason } または { result, created }
  */
-async function triageIssue({ api, repo, issueNumber, dryRun = false, log = console.log }) {
+async function recentTaskCount(api, repo, issue, now) {
+  const since = new Date(now - 24 * 60 * 60 * 1000);
+  const login = issue.user && issue.user.login;
+  if (!login) return 0;
+  const query = new URLSearchParams({
+    creator: login, labels: 'feedback:issue-created', state: 'all', since: since.toISOString(), per_page: '100',
+  });
+  const list = await api('GET', `/repos/${repo}/issues?${query}`);
+  return list.filter((i) => !i.pull_request && i.number !== issue.number && new Date(i.created_at) >= since).length;
+}
+
+async function triageIssue({ api, repo, issueNumber, dryRun = false, log = console.log, now = Date.now() }) {
+  if (!Number.isInteger(issueNumber) || issueNumber <= 0) throw new Error(`不正な Issue 番号です: ${issueNumber}`);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error(`不正なリポジトリ名です: ${repo}`);
   // イベントのペイロードは古い場合があるので、常に最新の Issue を取得する
   const issue = await api('GET', `/repos/${repo}/issues/${issueNumber}`);
   const labels = issue.labels.map((l) => (typeof l === 'string' ? l : l.name));
@@ -85,6 +109,16 @@ async function triageIssue({ api, repo, issueNumber, dryRun = false, log = conso
 
   let created = null;
   const reasons = result.reasons.map((r) => `- ${r}`).join('\n');
+  const trusted = TRUSTED_ASSOCIATIONS.includes(issue.author_association);
+  if (result.actionable && !trusted && (await recentTaskCount(api, repo, issue, now)) >= MAX_TASKS_PER_AUTHOR_PER_DAY) {
+    log(`  - 投稿者の 24 時間以内の自動起票が ${MAX_TASKS_PER_AUTHOR_PER_DAY} 件に達したため保留`);
+    await ensureLabels(api, repo, ['triaged', 'feedback:rate-limited']);
+    await api('POST', `/repos/${repo}/issues/${issueNumber}/comments`, {
+      body: 'フィードバックありがとうございます！\n\n短時間に多くのフィードバックをいただいたため、このフィードバックは自動での課題起票を保留しました。担当者が内容を確認します。',
+    });
+    await api('POST', `/repos/${repo}/issues/${issueNumber}/labels`, { labels: ['triaged', 'feedback:rate-limited'] });
+    return { result, created: null, rateLimited: true };
+  }
   if (result.actionable) {
     const taskLabels = ['課題', 'from-feedback', ...result.labels];
     await ensureLabels(api, repo, [...taskLabels, 'triaged', 'feedback:issue-created']);
@@ -142,4 +176,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { triageIssue, githubApi, ensureLabels, LABELS };
+module.exports = { triageIssue, githubApi, ensureLabels, LABELS, MAX_TASKS_PER_AUTHOR_PER_DAY };
